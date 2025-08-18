@@ -1,98 +1,37 @@
 import express from 'express';
 import cors from "cors"
 import bodyParser from 'body-parser';
-
+import fs from "fs";
+const FILE = "./data/questions.json";
+const right = "./data/rights.json";
 const server = express();
 
 server.use(cors())
 server.use(bodyParser.json())
 
-const rightOptions = {
-    "1": 2,
-    "2": 0,
-    "3": 0,
-    "4": 1
-}
 
-const questions = [
-    {
-        id: 1,
-        question: "Ali da nechpul bor?",
-        options: [
-            {
-                answer: "0",
-            },
-            {
-                answer: "-1",
-            },
-            {
-                answer: "100_000_000"
-            }
-        ]
-    },
-    {
-        id: 2,
-        question: "Bruhning profilidagi rasm nima?",
-        options: [
-            {
-                answer: "Capybara",
-            },
-            {
-                answer: "pony",
-            },
-            {
-                answer: "chubakabra",
-            },
-            {
-                answer: "krisa"
-            }
-        ]
-    },
-    {
-        id: 3,
-        question: "Matluba qattedi o'zi?",
-        options: [
-            {
-                answer: "Dacha",
-            },
-            {
-                answer: "Uy",
-            },
-            {
-                answer: "Maktab",
-            },
-            {
-                answer: "Uchebniy senter"
-            }
-        ]
-    },
-    {
-        id: 4,
-        question: "Bugaltr ishdan bo'shidimi yo' m ?",
-        options: [
-            {
-                answer: "Haydimiz",
-            },
-            {
-                answer: "Uloqtiramiz",
-            },
-            {
-                answer: "Tepporamiz",
-            }
-        ]
-    }
-]
+const questions = JSON.parse(fs.readFileSync(FILE, "utf-8"));
+const rightOptions = JSON.parse(fs.readFileSync(right, "utf-8"));
+
 server.get('/health', (req, res) => {
     res.send(
         { message: "ok" }
     );
 });
+
+
 server.get("/questions", (_, res) => {
     res.send(questions)
 })
+
+server.get("/rights", (_, res) => {
+    res.send(rightOptions)
+})
+
+
 server.post("/check", (req, res) => {
     let countOfRightAnswers = 0
-    const correctAnswers = [] // [questionID, correctOptionIndex]
+    const correctAnswers = []
 
     for (const a of req.body) {
         const optionIndex = rightOptions[a[0]]
@@ -101,7 +40,7 @@ server.post("/check", (req, res) => {
             countOfRightAnswers++
         }
 
-        correctAnswers.push([a[0], optionIndex]) // har bir savolning to'g'ri javobini qo'shamiz
+        correctAnswers.push([a[0], optionIndex])
     }
 
     res.send({
@@ -110,7 +49,6 @@ server.post("/check", (req, res) => {
     })
 })
 
-server.listen(3000)
 
 
 function getQuestion(questions, id) {
@@ -121,3 +59,55 @@ function getQuestion(questions, id) {
     }
     return null
 }
+
+
+
+function writeQuestions(data) {
+    fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
+}
+
+
+
+server.post("/questions", (req, res) => {
+    const questions = questions();
+    const newQuestion = {
+        id: questions.length + 1,
+        ...req.body
+    };
+    questions.push(newQuestion);
+    writeQuestions(questions);
+    res.send(newQuestion);
+});
+
+
+
+server.put("/questions/:id", (req, res) => {
+    const questions = questions();
+    const id = Number(req.params.id);
+
+    const index = questions.findIndex(q => q.id === id);
+    if (index === -1) return res.status(404).send({ error: "Not found" });
+
+    questions[index] = { ...questions[index], ...req.body };
+    writeQuestions(questions);
+    res.send(questions[index]);
+});
+
+
+
+
+
+server.delete("/questions/:id", (req, res) => {
+    let questions = questions();
+    const id = Number(req.params.id);
+
+    const newQuestions = questions.filter(q => q.id !== id);
+    writeQuestions(newQuestions);
+
+    res.send({ message: "Deleted", id });
+});
+
+
+
+
+server.listen(3000)
